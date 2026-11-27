@@ -49,9 +49,10 @@ E[zz<sup>H</sup>] ≈ (1 + Σp<sub>k</sub>/p<sub>p</sub> + tr((G<sup>H</sup>G)<s
 ```bash
 pip install -r requirements.txt
 cd python
-python run_figures.py            # full run: 200 drops × 300 noise realisations (same as MATLAB, ~15 min)
-python run_figures.py --quick    # quick preview: 50 × 100
-python run_figures.py --drops 100 --noise 200 --seed 7 --out ../figures
+python run_figures.py                 # full run: 1000 drops × 200 noise realisations (~50 min on 2 cores)
+python run_figures.py --quick         # quick preview: 50 × 100
+python run_figures.py --figs 1a,2     # only some figures (run subsets in parallel to use more cores)
+python run_figures.py --drops 200 --noise 300 --seed 7 --out ../figures   # MATLAB's original settings
 ```
 
 Using the core function directly:
@@ -68,8 +69,16 @@ print(r.rate_zf, r.rate_mrc, r.rate_ub_exact, r.rate_lb_exact)
 
 ## Results
 
-The figures below were generated with `python run_figures.py` (200 drone drops × 300
+The figures below were generated with `python run_figures.py` (1000 drone drops × 200
 noise/estimation-error realisations per point, seed 2018).
+
+**Smooth curves (common random numbers).** Every point on every curve is evaluated with the
+same seed, and drone positions and noise come from separate random streams. All points
+therefore see exactly the same 1000 drone geometries, even when *M* changes. Without this,
+each point draws its own drops. The lower bound E[1/SINR] is heavy-tailed: it is dominated by
+rare drops where two drones are almost aligned and G<sup>H</sup>G is nearly singular. So
+whether a point happens to sample such a drop makes the curve jump up and down, even with many
+more iterations.
 
 ### Figure 1a – ZF ergodic rate vs pilot SNR (M = 100)
 ![Figure 1a](figures/fig1a_rate_vs_pilot_snr_M100.png)
@@ -82,10 +91,9 @@ Observations:
 * The rate increases with pilot SNR and saturates once channel-estimation error
   becomes negligible (≈ 9.5 bits/s/Hz for M = 100, ≈ 12 bits/s/Hz for M = 500).
 * The **upper bound** log₂(1 + E[SINR]) is tight for all pilot SNRs.
-* With **M = 100** the **lower bound** is loose and irregular. E[1/SINR] is dominated by
-  occasional drops where two drones are close in angle and G<sup>H</sup>G is
-  ill-conditioned, so a few bad drops pull the bound down. This variability is part of the
-  model and is not a numerical artefact.
+* With **M = 100** the **lower bound** is noticeably loose (≈ 1.5–2 bits/s/Hz below the
+  simulation at high pilot SNR). This is because E[1/SINR] is dominated by the rare
+  ill-conditioned drone geometries described above.
 * With **M = 500** the array resolves the drones much better. Both exact bounds then hug the
   simulation. The closed-form approximation is accurate above roughly 15 dB pilot SNR but
   is optimistic at low pilot SNR, where the estimation error is no longer small.
@@ -109,7 +117,7 @@ is tight for every *M*. The lower bound converges to the simulated rate only for
 
 ## Notes on the Python port
 
-* The 300 inner noise realisations are vectorised with batched NumPy linear algebra,
+* The inner noise realisations are vectorised with batched NumPy linear algebra,
   so the Python version is considerably faster than the loop-based MATLAB code.
 * In the MATLAB MRC noise term, `G_est(:,lp_k)` is evaluated after the interference
   loop, so it uses drone *K*'s estimate instead of drone 1's. The Python port uses
