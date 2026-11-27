@@ -101,6 +101,9 @@ def calc_spawc2018(M: int, K: int, delta: float, lam: float, pu_p: float,
     n_noise   : noise / estimation-error realisations per drop (MATLAB: 300)
     """
     rng = np.random.default_rng() if rng is None else rng
+    # Independent streams for drone positions and for noise, so that the
+    # drone drops do not depend on M (useful for common random numbers).
+    drop_rng, noise_rng = rng.spawn(2)
     e = 1 / np.sqrt(pu_p)
     I = np.eye(K)
 
@@ -111,16 +114,16 @@ def calc_spawc2018(M: int, K: int, delta: float, lam: float, pu_p: float,
     sinr_mrc = np.empty(n_drops)
 
     for t in range(n_drops):
-        d, z1 = drop_drones(K, radius, rng)
+        d, z1 = drop_drones(K, radius, drop_rng)
         G, beta = los_channel(M, d, z1, delta, lam)
         pu = rhou / beta                                  # power control
         sq_pu = np.sqrt(pu)
 
         # ---- n_noise realisations, vectorised over the batch axis ----
-        W = _crandn(rng, n_noise, M, K)
+        W = _crandn(noise_rng, n_noise, M, K)
         G_est = G[None] + e * W                           # (B,M,K)
-        n = _crandn(rng, n_noise, M, 1)
-        q = _crandn(rng, n_noise, K, 1)
+        n = _crandn(noise_rng, n_noise, M, 1)
+        q = _crandn(noise_rng, n_noise, K, 1)
         x = sq_pu[None, :, None] * q                      # (B,K,1)
 
         # ZF: G_est^+ = (G_est^H G_est)^-1 G_est^H
